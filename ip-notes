@@ -1,0 +1,60 @@
+#!/bin/bash
+
+# Arguments: MODE ID TYPE CMD
+# Manual Mode: (no args) -> Updates all
+# Hook Mode: hook ID lxc/qemu pct/qm -> Updates specific ID
+
+MODE=$1
+ID=$2
+TYPE=$3
+CMD=$4
+
+update_machine() {
+    local id=$1
+    local type=$2 # 'lxc' or 'qemu'
+    local conf_cmd=$3 # 'pct' or 'qm'
+    
+    # Get Status
+    STATUS=$($conf_cmd status $id 2>/dev/null | awk '{print $2}')
+    if [ "$STATUS" != "running" ]; then
+         # Silent return for hook mode, verbose for manual
+         [ "$MODE" == "hook" ] && return
+         # echo "Skipping $type $id (stopped)" 
+         return
+    fi
+
+    # Get IP
+    if [ "$type" == "lxc" ]; then
+        IP=$(pct config $id 2>/dev/null | grep -oE 'ip=[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+' | head -n 1 | cut -d= -f2)
+        [ -z "$IP" ] && IP=$(pct exec $id -- hostname -I 2>/dev/null | tr ' ' '\n' | grep -v '^127\.' | head -n 1)
+    else
+        IP=$(pvesh get /nodes/$(hostname)/qemu/$id/agent/network-get-interfaces --output-format json 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+' | grep -v '^127\.' | head -n 1)
+    fi
+
+    [ -z "$IP" ] && return
+
+    # Get Notes
+    OLD=$($conf_cmd config $id | grep '^description:' | sed 's/^description: //' | python3 -c 'import sys, urllib.parse; print(urllib.parse.unquote(sys.stdin.read()))')
+    
+    # Only update if IP isn't already there
+    if ! echo "$OLD" | grep -q "$IP"; then
+        pvesh set /nodes/$(hostname)/$type/$id/config --description "$(printf "$IP\n\n$OLD")" >/dev/null 2>&1
+        echo "[✓] Updated $type $id with IP $IP"
+    fi
+}
+
+# --- MAIN LOGIC ---
+
+if [ "$MODE" == "hook" ]; then
+    # Hook Mode: Single Target
+    update_machine $ID $TYPE $CMD
+else
+    # Manual Bulk Mode
+    echo -e "\n\033[1;36m>>> Updating Proxmox Node Notes <<<\033[0m"
+    echo -e "\n\033[1;34m[LXC Containers]\033[0m"
+    for id in $(pct list 2>/dev/null | awk 'NR>1 {print $1}'); do update_machine $id "lxc" "pct"; done
+    
+    echo -e "\n\033[1;35m[Virtual Machines]\033[0m"
+    for id in $(qm list 2>/dev/null | awk 'NR>1 {print $1}'); do update_machine $id "qemu" "qm"; done
+    echo -e "\n\033[1;36m>>> Update Complete <<<\033[0m\n"
+fi

@@ -1,0 +1,25 @@
+#!/bin/bash
+
+# Monitors systemd logs for container/VM service starts
+# More reliable than PVE API logs
+
+journalctl -f | while read line; do
+    # Check for LXC Start: Started pve-container@100.service
+    if echo "$line" | grep -q "Started pve-container@"; then
+        CTID=$(echo "$line" | grep -oE 'pve-container@[0-9]+' | grep -oE '[0-9]+')
+        if [ -n "$CTID" ]; then
+            echo "Detected start of LXC $CTID"
+            (sleep 10 && /usr/local/bin/ip-notes hook $CTID lxc pct) &
+        fi
+    fi
+
+    # Check for VM Start: Started 100.scope or similar qemu output
+    if echo "$line" | grep -q "Started .*scope" && echo "$line" | grep -q "machine-qemu"; then
+         # Extract ID from machine-qemux2d100.scope
+         VMID=$(echo "$line" | grep -oE 'qemu\\x2d[0-9]+' | grep -oE '[0-9]+')
+         if [ -n "$VMID" ]; then
+             echo "Detected start of VM $VMID"
+             (sleep 30 && /usr/local/bin/ip-notes hook $VMID qemu qm) &
+         fi
+    fi
+done

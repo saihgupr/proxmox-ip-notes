@@ -1,0 +1,11 @@
+[Unit]
+Description=Proxmox IP Notes Auto-Updater
+After=network.target
+
+[Service]
+ExecStart=/usr/local/bin/proxmox-auto-ip-notes
+Restart=always
+User=root
+
+[Install]
+WantedBy=multi-user.target
