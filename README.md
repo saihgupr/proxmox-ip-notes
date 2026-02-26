@@ -60,5 +60,5 @@ systemctl stop proxmox-ip-notes && systemctl disable proxmox-ip-notes && rm -f /
 This command stops the service, disables it, removes the service definition, reloads systemd, and deletes the script files from your system path.
 
 ## Requirements
-*   **Proxmox VE 7.x or 8.x**
+*   **Proxmox VE 7.x, 8.x, or 9.x**
 *   **QEMU Guest Agent** (Required for VMs to report their IP)
