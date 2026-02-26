@@ -51,12 +51,13 @@ ip-notes
 
 ## Uninstallation
 
-If you wish to remove the utility, run the uninstall script as root:
+To completely remove the utility and its service, run this command as root from anywhere:
 
 ```bash
-chmod +x uninstall.sh
-./uninstall.sh
+systemctl stop proxmox-ip-notes && systemctl disable proxmox-ip-notes && rm -f /etc/systemd/system/proxmox-ip-notes.service && systemctl daemon-reload && rm -f /usr/local/bin/ip-notes /usr/local/bin/proxmox-auto-ip-notes
 ```
+
+This command stops the service, disables it, removes the service definition, reloads systemd, and deletes the script files from your system path.
 
 ## Requirements
 *   **Proxmox VE 7.x or 8.x**
